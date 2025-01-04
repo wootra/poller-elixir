@@ -11,26 +11,12 @@ defmodule PollerCore.Data.Question do
           id: integer,
           description: String.t(),
           # [PollerCore.Data.Choice.id]
-          choices: [integer] | [Choice.t()]
+          choices: [Choice.t()]
         }
 
-  @spec new(integer, String.t(), [integer]) :: t
-  def new(id, description, choices \\ [])
-
-  @spec new(integer, String.t(), [integer]) :: t
-  def new(id, description, choices)
-      when is_integer(id) and is_bitstring(description) and is_list(choices) do
-    %__MODULE__{
-      id: id,
-      description: description,
-      choices: Validators.integer_list(choices)
-    }
-  end
-
-  def new(_id, _description, _choices),
-    do: raise(ArgumentError, "Invalid arguments. should be (integer, string, [number])")
-
   @spec new_converted(integer, String.t(), [Choice.t()]) :: t
+  @spec new_converted(integer(), bitstring(), [PollerCore.Data.Choice.t()]) ::
+          PollerCore.Data.Question.t()
   def new_converted(id, description, choices \\ [])
 
   @spec new_converted(integer, String.t(), [Choice.t()]) :: t

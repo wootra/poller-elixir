@@ -2,10 +2,8 @@ defmodule PollerCore.Core do
   @moduledoc """
   PollerCore is a library for creating and managing polls.
   """
-  alias PollerCore.Data.Poll
-  alias PollerCore.Data.Question
-  alias PollerCore.Data.Choice
-  alias PollerCore.Data.Party
+  alias PollerCore.Data.{Poll, Question, Choice, Party}
+  alias PollerCore.Db
 
   use GenServer
 
@@ -16,48 +14,78 @@ defmodule PollerCore.Core do
     GenServer.start_link(__MODULE__, get_initial_state(district_id), name: name)
   end
 
-  def get_initial_state(district_id \\ 1)
+  def get_votes(district_id) when is_integer(district_id) do
+    GenServer.call(PollerCore.Db, {:get_poll, district_id})
+  end
 
-  def get_initial_state(district_id) when is_bitstring(district_id) do
+  def vote(choice_id) when is_integer(choice_id) do
+    GenServer.cast(PollerCore.Db, {:vote, choice_id})
+  end
+
+  @spec get_party(map(), integer()) :: Party.t()
+  defp get_party(parties, id) when is_map(parties) and is_integer(id) do
+    name = Map.get(parties, id, "unknown")
+    Party.new(id, name)
+  end
+
+  defp get_choices(question_id) when is_integer(question_id) do
+    Db.get_choices(question_id)
+  end
+
+  @spec get_choices_map(%{integer() => String.t()}, [Question.t()]) :: %{
+          integer() => [Choice.t()]
+        }
+  defp get_choices_map(parties, questions) when is_list(questions) do
+    questions
+    |> Enum.map(
+      &{&1.id,
+       get_choices(&1.id)
+       |> Enum.map(fn choice ->
+         Choice.new_converted(
+           choice.id,
+           choice.description,
+           get_party(parties, choice.party)
+         )
+       end)}
+    )
+    |> Enum.into(%{})
+  end
+
+  @spec get_initial_state(String.t()) :: Poll.t()
+  defp get_initial_state(district_id) when is_bitstring(district_id) do
     get_initial_state(String.to_integer(district_id))
   end
 
-  def get_initial_state(1) do
+  @spec get_initial_state(integer()) :: Poll.t()
+  defp get_initial_state(district_id) when is_integer(district_id) do
     # load from database
+    parties = PollerCore.Db.get_parties()
+
+    questions =
+      PollerCore.Db.get_questions(district_id)
+
+    choice_map = get_choices_map(parties, questions)
+
+    questions =
+      questions
+      |> Enum.map(
+        &Question.new_converted(
+          &1.id,
+          &1.description,
+          Map.get(choice_map, 1, [])
+        )
+      )
+
+    votes = PollerCore.Db.get_votes(1)
+
     Poll.new_converted(
       1,
-      [
-        Question.new_converted(1, "Who will you vote for?", [
-          Choice.new_converted(1, "Candidate1", Party.new(1, "Democrat")),
-          Choice.new_converted(2, "Candidate2", Party.new(2, "Republican")),
-          Choice.new_converted(3, "Candidate3", Party.new(3, "Independent"))
-        ]),
-        Question.new_converted(2, "Who will you vote for?", [
-          Choice.new_converted(4, "Candidate4", Party.new(1, "Democrat")),
-          Choice.new_converted(5, "Candidate5", Party.new(2, "Republican")),
-          Choice.new_converted(6, "Candidate6", Party.new(3, "Independent"))
-        ])
-      ],
-      %{
-        1 => 0,
-        2 => 0,
-        3 => 0,
-        4 => 0,
-        5 => 0,
-        6 => 0
-      }
+      questions,
+      votes
     )
   end
 
-  def get_initial_state(district_id) when is_integer(district_id) do
-    # load from database
-    case district_id do
-      1 -> get_initial_state(1)
-      _ -> raise ArgumentError, "Invalid district_id"
-    end
-  end
-
-  def get_initial_state(_) do
+  defp get_initial_state(_) do
     raise ArgumentError, "Invalid arguments. should be (integer)"
   end
 
@@ -70,22 +98,5 @@ defmodule PollerCore.Core do
   def terminate(_reason, _state) do
     IO.inspect("should save final result to database")
     :ok
-  end
-
-  @impl true
-  def handle_call(:get_poll, _from, state) do
-    {:reply, state, state}
-  end
-
-  @impl true
-  def handle_cast({:vote, choice_id}, state) do
-    existing_votes = Map.get(state.votes, choice_id, 0)
-
-    new_state = %Poll{
-      state
-      | votes: Map.put(state.votes, choice_id, existing_votes + 1)
-    }
-
-    {:noreply, new_state}
   end
 end

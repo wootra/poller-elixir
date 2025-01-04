@@ -21,16 +21,6 @@ defmodule PollerCore.Data.Validators do
         iex> PollerCore.Data.Validator.integer_list([1, 2, "3"])
         ** (ArgumentError) Invalid arguments. should be ([number])
   """
-  @spec integer_list([integer]) :: [integer]
-  def integer_list([item | more]) when is_integer(item) do
-    [item | integer_list(more)]
-  end
-
-  def integer_list([]), do: []
-
-  def integer_list([_item | _more]) do
-    raise ArgumentError, "Invalid arguments. should be ([number])"
-  end
 
   def question_list([item | more]) do
     [converted_question(item) | question_list(more)]
@@ -59,14 +49,14 @@ defmodule PollerCore.Data.Validators do
     })"
   end
 
-  @spec choice_list([Choice.t2()]) :: [Choice.t2()]
+  @spec choice_list([Choice.t()]) :: [Choice.t()]
   def choice_list([item | more]) do
     [converted_choice(item) | choice_list(more)]
   end
 
   def choice_list([]), do: []
 
-  @spec converted_choice(Choice.t2()) :: Choice.t2()
+  @spec converted_choice(Choice.t()) :: Choice.t()
   def converted_choice(%Choice{
         id: id,
         party: party,

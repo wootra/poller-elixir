@@ -7,6 +7,7 @@ defmodule PollerCore.App do
 
   def start(_type, _args) do
     children = [
+      PollerCore.Db,
       PollerCore.Supervisor
     ]
 
